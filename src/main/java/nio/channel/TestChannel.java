@@ -3,14 +3,23 @@ package nio.channel;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.RandomAccessFile;
+import java.io.UnsupportedEncodingException;
 import java.nio.ByteBuffer;
+import java.nio.CharBuffer;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileChannel.MapMode;
+import java.nio.charset.CharacterCodingException;
+import java.nio.charset.Charset;
+import java.nio.charset.CharsetDecoder;
+import java.nio.charset.CharsetEncoder;
 import java.nio.file.OpenOption;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
+import java.util.Map.Entry;
+import java.util.SortedMap;
 
 import org.junit.Test;
 
@@ -155,4 +164,112 @@ public class TestChannel {
 		outChannel.close();
 	}
 	
+	/* 
+	 * 五、分散（Scatter）与聚集（Gather）
+	 * 分散读取（Scattering Reads）：将通道中的数据分散到多个缓冲区中
+	 * 聚集写入（Gathering Writes）：将多个缓冲区中的数据聚集到通道中
+	 * 
+	 * 
+	 * @author happyBKs
+	 *
+	 */
+	//分散与聚集
+	@Test
+	public void test4() throws IOException{
+		RandomAccessFile raf1=new RandomAccessFile("D:/Test/NIO/t1.txt", "rw");
+		
+		//1、获取通道
+		FileChannel channel1 = raf1.getChannel();
+		
+		//2、分配指定大小的缓冲区
+		ByteBuffer buf1=ByteBuffer.allocate(100);
+		ByteBuffer buf2=ByteBuffer.allocate(1024);
+		
+		//3、分散读取
+		ByteBuffer[] bufs={buf1,buf2};
+		channel1.read(bufs);
+		
+		for(ByteBuffer byteBuffer:bufs){
+			byteBuffer.flip();
+		}
+		
+		System.out.println(new String(bufs[0].array(),0,bufs[0].limit()));
+		System.out.println("-----------------------------------------");
+		System.out.println(new String(bufs[1].array(),0,bufs[1].limit()));
+		
+		
+		//4、聚集写入
+		RandomAccessFile raf2=new RandomAccessFile("D:/Test/NIO/t2.txt", "rw");
+		FileChannel channel2 = raf2.getChannel();
+		
+		channel2.write(bufs);
+		
+		channel2.close();
+		raf2.close();
+		channel1.close();
+		raf1.close();
+
+	}
+	
+	/*
+	 *  六、字符集：CharSet
+	 * 编码：字符串 -> 字节数组
+	 * 解码：字节数组 -> 字符串
+	 */
+	@Test
+	public void test5(){
+		SortedMap<String, Charset> availableCharsets = Charset.availableCharsets();
+		for(Entry<String, Charset> entry:availableCharsets.entrySet()){
+			System.out.println(String.format("%s: %s", entry.getKey(), entry.getValue()));
+		}
+	}
+	
+	@Test
+	public void test6() throws CharacterCodingException{
+		Charset charset1 = Charset.forName("GBK");
+		//获取编码器
+		CharsetEncoder encoder = charset1.newEncoder();
+		
+		//获取解码器
+		CharsetDecoder decoder = charset1.newDecoder();
+		
+		CharBuffer charBuffer = CharBuffer.allocate(1024);
+		charBuffer.put("happyBKs的博客");
+		
+		
+		//编码
+		charBuffer.flip();//因为编码要读取charBuffer，所以要先切到度模式
+		ByteBuffer byteBuffer=encoder.encode(charBuffer);
+		
+		//byteBuffer.limit()为14，英文字符一个1 byte，中文字符一个2 byte
+		for(int i_byteBuffer=0;i_byteBuffer<byteBuffer.limit();i_byteBuffer++){
+			System.out.println(byteBuffer.get());
+			//104,97,112,112,121,66,75,115,-75,-60,-78,-87,-65,-51
+		}
+		
+		//解码
+		byteBuffer.flip();//因为解码要读取byteBuffer，所以要先切到度模式，不然下面一行什么也不输出
+		CharBuffer charBufferDecoded=decoder.decode(byteBuffer);
+		System.out.println(charBufferDecoded.toString());
+		
+		System.out.println("---------------------------------------------------");
+		
+		Charset utf8Chatset = Charset.forName("UTF-8");
+		byteBuffer.flip();//byteBuffer刚才读过了，现在需要从头再读一遍，需要先调用flip()
+		CharBuffer charBufferDecodedByUTF8=utf8Chatset.decode(byteBuffer);
+		System.out.println(charBufferDecodedByUTF8.toString());
+		
+		
+		System.out.println("---------------------------------------------------");
+		Charset gbkChatset = Charset.forName("GBK");
+		byteBuffer.flip();//byteBuffer刚才读过了，现在需要从头再读一遍，需要先调用flip()
+		CharBuffer charBufferDecodedByGBK=gbkChatset.decode(byteBuffer);
+		System.out.println(charBufferDecodedByGBK.toString());
+		
+	}
+	
+	public static void main(String[] args) throws UnsupportedEncodingException {
+		byte[] bys = {104,97,112,112,121,66,75,115,-75,-60,-78,-87,-65,-51};
+		System.out.println(new String(bys,"GBK"));//happyBKs的博客
+	}
 }
