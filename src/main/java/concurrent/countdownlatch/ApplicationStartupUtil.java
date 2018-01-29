@@ -1,4 +1,4 @@
-package concurrent;
+package concurrent.countdownlatch;
 
 import java.util.ArrayList;
 import java.util.List;

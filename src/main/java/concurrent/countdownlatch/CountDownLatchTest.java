@@ -1,4 +1,4 @@
-package concurrent;
+package concurrent.countdownlatch;
 
 public class CountDownLatchTest {
 
